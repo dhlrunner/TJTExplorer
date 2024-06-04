@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TJTExplorer", "TJTExplorer.csproj", "{D28E4731-2A81-4C98-940E-779579F678DB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D28E4731-2A81-4C98-940E-779579F678DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D28E4731-2A81-4C98-940E-779579F678DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D28E4731-2A81-4C98-940E-779579F678DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D28E4731-2A81-4C98-940E-779579F678DB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3930893C-9EE1-477A-B0A0-39628C35BC68}
+	EndGlobalSection
+EndGlobal
