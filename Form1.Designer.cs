@@ -35,6 +35,9 @@
             this.colFileName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colFileSize = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colFileOffset = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.exportSelectedToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.removeSelectedToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.toolStripFile = new System.Windows.Forms.ToolStripDropDownButton();
             this.createNewTJTFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -55,12 +58,9 @@
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.toolStripProgressBar1 = new System.Windows.Forms.ToolStripProgressBar();
             this.toolStripStatusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
-            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
-            this.exportSelectedToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.removeSelectedToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.contextMenuStrip1.SuspendLayout();
             this.toolStrip1.SuspendLayout();
             this.statusStrip1.SuspendLayout();
-            this.contextMenuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // lstTJTFiles
@@ -105,6 +105,28 @@
             this.colFileOffset.Text = "Offset";
             this.colFileOffset.Width = 135;
             // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.exportSelectedToolStripMenuItem,
+            this.removeSelectedToolStripMenuItem});
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(181, 70);
+            // 
+            // exportSelectedToolStripMenuItem
+            // 
+            this.exportSelectedToolStripMenuItem.Name = "exportSelectedToolStripMenuItem";
+            this.exportSelectedToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.exportSelectedToolStripMenuItem.Text = "Export selected";
+            this.exportSelectedToolStripMenuItem.Click += new System.EventHandler(this.exportSelectedToolStripMenuItem_Click);
+            // 
+            // removeSelectedToolStripMenuItem
+            // 
+            this.removeSelectedToolStripMenuItem.Name = "removeSelectedToolStripMenuItem";
+            this.removeSelectedToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.removeSelectedToolStripMenuItem.Text = "Remove selected";
+            this.removeSelectedToolStripMenuItem.Click += new System.EventHandler(this.removeSelectedToolStripMenuItem_Click);
+            // 
             // toolStrip1
             // 
             this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -133,14 +155,14 @@
             // createNewTJTFileToolStripMenuItem
             // 
             this.createNewTJTFileToolStripMenuItem.Name = "createNewTJTFileToolStripMenuItem";
-            this.createNewTJTFileToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.createNewTJTFileToolStripMenuItem.Size = new System.Drawing.Size(170, 22);
             this.createNewTJTFileToolStripMenuItem.Text = "Create new TJT file";
             this.createNewTJTFileToolStripMenuItem.Click += new System.EventHandler(this.createNewTJTFileToolStripMenuItem_Click);
             // 
             // openExistTJTFileToolStripMenuItem
             // 
             this.openExistTJTFileToolStripMenuItem.Name = "openExistTJTFileToolStripMenuItem";
-            this.openExistTJTFileToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.openExistTJTFileToolStripMenuItem.Size = new System.Drawing.Size(170, 22);
             this.openExistTJTFileToolStripMenuItem.Text = "Open exist TJT file";
             this.openExistTJTFileToolStripMenuItem.Click += new System.EventHandler(this.openExistTJTFileToolStripMenuItem_Click);
             // 
@@ -148,7 +170,7 @@
             // 
             this.exportToTJTToolStripMenuItem.Enabled = false;
             this.exportToTJTToolStripMenuItem.Name = "exportToTJTToolStripMenuItem";
-            this.exportToTJTToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.exportToTJTToolStripMenuItem.Size = new System.Drawing.Size(170, 22);
             this.exportToTJTToolStripMenuItem.Text = "Export to TJT";
             this.exportToTJTToolStripMenuItem.Click += new System.EventHandler(this.exportToTJTToolStripMenuItem_Click);
             // 
@@ -156,7 +178,7 @@
             // 
             this.extractAllToolStripMenuItem.Enabled = false;
             this.extractAllToolStripMenuItem.Name = "extractAllToolStripMenuItem";
-            this.extractAllToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.extractAllToolStripMenuItem.Size = new System.Drawing.Size(170, 22);
             this.extractAllToolStripMenuItem.Text = "Extract All";
             this.extractAllToolStripMenuItem.Click += new System.EventHandler(this.extractAllToolStripMenuItem_Click);
             // 
@@ -289,26 +311,6 @@
             this.toolStripStatusLabel1.Size = new System.Drawing.Size(31, 17);
             this.toolStripStatusLabel1.Text = "준비";
             // 
-            // contextMenuStrip1
-            // 
-            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.exportSelectedToolStripMenuItem,
-            this.removeSelectedToolStripMenuItem});
-            this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(164, 48);
-            // 
-            // exportSelectedToolStripMenuItem
-            // 
-            this.exportSelectedToolStripMenuItem.Name = "exportSelectedToolStripMenuItem";
-            this.exportSelectedToolStripMenuItem.Size = new System.Drawing.Size(163, 22);
-            this.exportSelectedToolStripMenuItem.Text = "Export selected";
-            // 
-            // removeSelectedToolStripMenuItem
-            // 
-            this.removeSelectedToolStripMenuItem.Name = "removeSelectedToolStripMenuItem";
-            this.removeSelectedToolStripMenuItem.Size = new System.Drawing.Size(163, 22);
-            this.removeSelectedToolStripMenuItem.Text = "Remove selected";
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -331,11 +333,11 @@
             this.Name = "Form1";
             this.Text = "TJT Explorer";
             this.Load += new System.EventHandler(this.Form1_Load);
+            this.contextMenuStrip1.ResumeLayout(false);
             this.toolStrip1.ResumeLayout(false);
             this.toolStrip1.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
-            this.contextMenuStrip1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 

@@ -97,13 +97,13 @@ namespace TJTExplorer.Class
 
             tjtReader.BaseStream.Seek(tjtHeaderSize + 2, SeekOrigin.Begin);
 
-            uint lastFileSize = 0;
+            ulong lastFileSize = 0;
             for (uint i = 0; i < FileCount; i++)
             {
                 string fname = Encoding.ASCII.GetString(tjtReader.ReadBytes((int)fileNameSize)).Split('\0')[0];
                 uint fsize = tjtReader.ReadUInt32();
                 uint fIdx = i;
-                uint fOffset = dataStartOffset + lastFileSize;
+                ulong fOffset = dataStartOffset + lastFileSize;
 
                 lastFileSize = lastFileSize + fsize;
 
@@ -150,7 +150,7 @@ namespace TJTExplorer.Class
             using (BinaryWriter writer = new BinaryWriter(new FileStream(outFileName, FileMode.Create)))
             {
                 await Task.Run(() => {
-                    this.tjtReader.BaseStream.Seek(file.StartOffset, SeekOrigin.Begin);
+                    this.tjtReader.BaseStream.Seek((long)file.StartOffset, SeekOrigin.Begin);
 
                     uint amari = file.Size % writerBufferSize;
                     uint kake = file.Size / writerBufferSize;
@@ -173,11 +173,33 @@ namespace TJTExplorer.Class
            
         }
 
+        public void ExtractFile(TJTarFile file, string outFileName)
+        {
+            using (BinaryWriter writer = new BinaryWriter(new FileStream(outFileName, FileMode.Create)))
+            {
+                this.tjtReader.BaseStream.Seek((long)file.StartOffset, SeekOrigin.Begin);
+
+                uint amari = file.Size % writerBufferSize;
+                uint kake = file.Size / writerBufferSize;
+
+                for (int i = 0; i < kake; i++)
+                {
+                    byte[] _buffer = this.tjtReader.ReadBytes((int)writerBufferSize);
+                    writer.Write(_buffer);
+                }
+
+                byte[] buffer = this.tjtReader.ReadBytes((int)amari);
+                writer.Write(buffer);
+                writer.Flush();
+
+            }
+        }
+
         public byte[] GetFileBytes(TJTarFile file)
         {
             if (!file.IsNew)
             {
-                this.tjtReader.BaseStream.Seek(file.StartOffset, SeekOrigin.Begin);
+                this.tjtReader.BaseStream.Seek((long)file.StartOffset, SeekOrigin.Begin);
                 return this.tjtReader.ReadBytes((int)file.Size);
             }
             else
@@ -194,7 +216,15 @@ namespace TJTExplorer.Class
         }
 
 
-
+        /// <summary>
+        /// (비동기) 파일들 추가
+        /// </summary>
+        /// <param name="files">파일명, 전체파일 경로 튜플 배열</param>
+        /// <param name="progress">진행률 보고용</param>
+        /// <returns></returns>
+        /// <exception cref="FileNotFoundException"></exception>
+        /// <exception cref="TJTarFileSizeOverException"></exception>
+        /// <exception cref="TJTarFileNameIsTooLongException"></exception>
         public async Task AddFilesAsync((string fileName, string fullFilePath)[]files , IProgress<int> progress = null)
         {
             await Task.Run(() =>
@@ -224,16 +254,22 @@ namespace TJTExplorer.Class
                 for (int i = 0; i < files.Length; i++)
                 {
                     string fileName = files[i].fileName.Replace("\\", "/");
-                    if (fileName.Length > 0x80) throw new Exception($"Filename {files[i].fileName} is too long.");
+                    if (fileName.Length > 0x80) throw new TJTarFileNameIsTooLongException($"Filename {files[i].fileName} is too long.");
                     string filePath = files[i].fullFilePath;
-                    uint size = (uint)new FileInfo(filePath).Length;
+                    ulong size = (ulong)new FileInfo(filePath).Length;
+
+                    if(size > uint.MaxValue)
+                    {
+                        throw new TJTarFileSizeOverException("단일 파일의 크기가 4GB를 초과했습니다.");
+                    }
+
                     if (File.Exists(filePath))
                     {
                         TJTarFile file = new TJTarFile();
                         file.Name = fileName;
                         file.RealFilePath = filePath;
                         file.IsNew = true;
-                        file.Size = size;
+                        file.Size = (uint)size;
                         //file.Index = lastFileIndex;
                         this.Files.Add(file);
                         //lastFileIndex++;
@@ -241,7 +277,7 @@ namespace TJTExplorer.Class
                     }
 
 
-
+                    
                     if (progress != null) progress.Report(i);
                 }
 
@@ -340,7 +376,10 @@ namespace TJTExplorer.Class
         public string Name;      
         public uint Size;
         public uint Index;
-        public uint StartOffset;
+
+        //TJ미디어의 찐빠로 가끔씩 4GB가 넘는 TJT파일이 나오는 경우가 생김
+        //그럴 경우를 대비해서 64비트로 설정
+        public ulong StartOffset;
 
         //새롭게 추가된 파일일때
         public string RealFilePath;
@@ -362,6 +401,23 @@ namespace TJTExplorer.Class
         }
 
         public TJTarFileSizeOverException(string message, Exception inner)
+            : base(message, inner)
+        {
+        }
+    }
+
+    public class TJTarFileNameIsTooLongException : Exception
+    {
+        public TJTarFileNameIsTooLongException()
+        {
+        }
+
+        public TJTarFileNameIsTooLongException(string message)
+            : base(message)
+        {
+        }
+
+        public TJTarFileNameIsTooLongException(string message, Exception inner)
             : base(message, inner)
         {
         }

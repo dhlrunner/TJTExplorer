@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,7 +39,7 @@ namespace TJTExplorer
                     file.Index.ToString(),
                     file.Name,
                     file.Size.ToString(),
-                    file.StartOffset.ToString("X2")
+                    file.StartOffset.ToString("X8")
                 });
                 item.Tag = file;
 
@@ -103,30 +104,44 @@ namespace TJTExplorer
         {
             if (lstTJTFiles.SelectedItems.Count > 0)
             {
-                if (!Directory.Exists("./temp"))
-                {
-                    Directory.CreateDirectory(Application.StartupPath + "./temp");
-                }
-
                 TJTarFile file = (TJTarFile)lstTJTFiles.SelectedItems[0].Tag;
-
-                if(!Directory.Exists("./temp/" + Path.GetDirectoryName(file.Name)))
-                {
-                    Directory.CreateDirectory("./temp/" + Path.GetDirectoryName(file.Name));
-                }
                 
-                Task extTask = TJTFile.ExtractFileAsync(file, "./temp/" + file.Name);
+                if (!file.IsNew) 
+                {
+                    if (!Directory.Exists("./temp"))
+                    {
+                        Directory.CreateDirectory(Application.StartupPath + "./temp");
+                    }
 
-                extTask.GetAwaiter().OnCompleted(() => {
-                    ProcessStartInfo psi = new ProcessStartInfo();
-                    psi.FileName = "temp\\" + file.Name;
-                    psi.UseShellExecute = true;
-                    psi.WorkingDirectory = Application.StartupPath;
-                    Process.Start(psi);
-                    Console.WriteLine("Extract task end");
-                });
+                    if (!Directory.Exists("./temp/" + Path.GetDirectoryName(file.Name)))
+                    {
+                        Directory.CreateDirectory("./temp/" + Path.GetDirectoryName(file.Name));
+                    }
 
-                Console.WriteLine("Extract task started");
+                    Task extTask = TJTFile.ExtractFileAsync(file, "./temp/" + file.Name);
+
+                    extTask.GetAwaiter().OnCompleted(() => {
+                        try
+                        {
+                            ProcessStartInfo psi = new ProcessStartInfo();
+                            psi.FileName = "temp\\" + file.Name;
+                            psi.UseShellExecute = true;
+                            psi.WorkingDirectory = Application.StartupPath;
+                            Process.Start(psi);
+                        }
+                        catch (Win32Exception)
+                        {
+                            MessageBox.Show($"\"{file.Name}\"\n연결된 어플리케이션이 없어 직접 파일을 열 수 없습니다.", "파일 열기 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+
+
+                        Console.WriteLine("Extract task end");
+                    });
+
+                    Console.WriteLine("Extract task started");
+                }
+
+               
             }
 
         }
@@ -180,12 +195,17 @@ namespace TJTExplorer
                         try
                         {
                             //Application.DoEvents();
-                            TJTFile.AddFilesAsync(fileNamePair).GetAwaiter().OnCompleted(() => 
+                            Task t = TJTFile.AddFilesAsync(fileNamePair);
+                            t.GetAwaiter().OnCompleted(() =>
                             {
                                 RefreshFileList();
                                 toolStripStatusLabel1.Text = $"{files.Length}개 파일 추가됨";
                                 toolStripProgressBar1.Value = 0;
                                 toolStripProgressBar1.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
+                            });
+                            t.ContinueWith((E) => 
+                            {
+                                
                             });
                         }
                         catch (TJTarFileSizeOverException)
@@ -235,56 +255,70 @@ namespace TJTExplorer
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                var p = new Progress<int>((cnt) =>
-                {
-                    this.Invoke((Action)(() => 
-                    {
-                        toolStripProgressBar1.Value = cnt + 1;
-                        toolStripStatusLabel1.Text = $"추가 중... ({cnt}/{toolStripProgressBar1.Maximum})";
-                    }));
-                });
+                
 
                 await Task.Factory.StartNew(() => 
                 {
                     this.Invoke((Action)(() => 
                     {
+                        btnAddFiles.Enabled = false;
+                        btnAddFolder.Enabled = false;
+                        openExistTJTFileToolStripMenuItem.Enabled = false;
+                        createNewTJTFileToolStripMenuItem.Enabled = false;
+                        exportToTJTToolStripMenuItem.Enabled = false;
+                        extractAllToolStripMenuItem.Enabled = false;
+
+                        var p = new Progress<int>((cnt) =>
+                        {
+                            this.Invoke((Action)(() =>
+                            {
+                                toolStripProgressBar1.Value = cnt + 1;
+                                toolStripStatusLabel1.Text = $"추가 중... ({cnt + 1}/{toolStripProgressBar1.Maximum})";
+                                //Application.DoEvents();
+                            }));
+                        });
+
                         toolStripProgressBar1.Maximum = openFileDialog.FileNames.Length;
                         
 
                         (string, string)[] fileNamePair = new (string, string)[openFileDialog.FileNames.Length];
-                        Stopwatch sw = new Stopwatch();
-                        sw.Start();
+
+                        toolStripStatusLabel1.Text = "파일 정보 분석 중..";
+                        //여기 왜그런지 모르겠는데 엄청 느림
                         for (int i = 0; i < openFileDialog.FileNames.Length; i++)
                         {
                             string fn = openFileDialog.FileNames[i];
-                            string n = fn.Substring(fn.LastIndexOf('\\')+1);
+                            string n = fn.Substring(fn.LastIndexOf('\\')+1); //파일명만 떼오기
                             fileNamePair[i] = (n, fn);
-                            Console.WriteLine($"{n},{fn}");
-                            //Application.DoEvents();
+                            toolStripProgressBar1.Value = i + 1;
+                            toolStripStatusLabel1.Text = $"파일 정보 분석 중.. ({i + 1}/{toolStripProgressBar1.Maximum})";
+                            Application.DoEvents(); //Task.Factory 쓰고 있는데 왜 이거 안해주면 UI 스레드가 차단되는지 모르겠음
                         }
-                        sw.Stop();
-                        Console.WriteLine(sw.Elapsed);
-                        try
+                        
+                        
+                        
+                        Task t = TJTFile.AddFilesAsync(fileNamePair, p);
+                        t.GetAwaiter().OnCompleted(() =>
                         {
-                            TJTFile.AddFilesAsync(fileNamePair, p).GetAwaiter().OnCompleted(() =>
+                            RefreshFileList();
+                            toolStripStatusLabel1.Text = $"{openFileDialog.FileNames.Length}개 파일 추가됨";
+                            btnAddFiles.Enabled = true;
+                            btnAddFolder.Enabled = true;
+                            openExistTJTFileToolStripMenuItem.Enabled = true;
+                            createNewTJTFileToolStripMenuItem.Enabled = true;
+                            exportToTJTToolStripMenuItem.Enabled = true;
+                            extractAllToolStripMenuItem.Enabled = true;
+                        });
+                        t.ContinueWith(ex =>
+                        {
+                            if (ex.Exception.InnerExceptions[0] is TJTarFileSizeOverException)
                             {
-                                RefreshFileList();
-                                toolStripStatusLabel1.Text = $"{openFileDialog.FileNames.Length}개 파일 추가됨";
-                            });
-                            //t.ContinueWith(ex =>
-                            //{
-                            //    if (ex.Exception.InnerExceptions[0] is TJTarFileSizeOverException)
-                            //    {
-                            //        MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            //    }
-                            //}, TaskContinuationOptions.OnlyOnFaulted);
-                            ////t.Start();
+                                MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }, TaskContinuationOptions.OnlyOnFaulted);
+                        //t.Start();
 
-                        }
-                        catch (TJTarFileSizeOverException)
-                        {
-                            MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
+                        
                     }));
 
                    
@@ -308,8 +342,8 @@ namespace TJTExplorer
                 {
                     this.Invoke((Action)(() => 
                     {
-                        toolStripProgressBar1.Value = cnt;
-                        toolStripStatusLabel1.Text = $"TJT 빌드 중 ({toolStripProgressBar1.Maximum}/{cnt})";
+                        toolStripProgressBar1.Value = cnt+1;
+                        toolStripStatusLabel1.Text = $"TJT 빌드 중 ({cnt+1}/{toolStripProgressBar1.Maximum})";
 
                     }));
                 });
@@ -340,14 +374,86 @@ namespace TJTExplorer
 
         private void extractAllToolStripMenuItem_Click(object sender, EventArgs e)
         {
+           
+        }
+
+        private void removeSelectedToolStripMenuItem_Click(object sender, EventArgs e)
+        {
 
         }
 
+        private void exportSelectedToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (lstTJTFiles.SelectedItems.Count > 0)
+            {
+                uint count = 0;
+                //TJTarFile[] file = new TJTarFile[lstTJTFiles.SelectedItems.Count];
+                //추출할 파일이 1개 이상인지 확인
+                for (int i = 0; i < lstTJTFiles.SelectedItems.Count; i++)
+                {
+                    TJTarFile f = (TJTarFile)lstTJTFiles.SelectedItems[i].Tag;
+                    if (!f.IsNew) count++;
+                    //file[i] = f;
+                }
+
+                if (count == 0)
+                {
+                    MessageBox.Show("추출 가능한 파일이 없습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    return;
+                }
+
+                VistaFolderBrowserDialog folderDialog = new VistaFolderBrowserDialog();
+
+                if (folderDialog.ShowDialog() == DialogResult.OK)
+                {
+
+                    Task.Factory.StartNew(() => {
+                        string rootDir = folderDialog.SelectedPath;
+                        this.Invoke((Action)(() =>
+                        {
+                            toolStripStatusLabel1.Text = "선택한 파일 추출 중...";
+                            toolStripProgressBar1.Maximum = (int)count;
+                            toolStripProgressBar1.Value = 0;
+                            foreach (ListViewItem item in lstTJTFiles.SelectedItems)
+                            {
+                                TJTarFile f = (TJTarFile)item.Tag;
+                                if (!f.IsNew)
+                                {
+
+                                    if (!Directory.Exists(rootDir + "\\" + Path.GetDirectoryName(f.Name)))
+                                    {
+                                        Directory.CreateDirectory(rootDir + "\\" + Path.GetDirectoryName(f.Name));
+                                    }
+
+                                    TJTFile.ExtractFile(f, rootDir + "\\" + f.Name);
+                                    toolStripProgressBar1.Value++;
+                                    toolStripStatusLabel1.Text = $"선택한 파일 추출 중... ({toolStripProgressBar1.Value}/{toolStripProgressBar1.Maximum})";
+                                    Application.DoEvents();
+                                }
+                            }
+                            toolStripStatusLabel1.Text = $"선택된 {count}개 파일을 \"{rootDir}\" 폴더에 추출했습니다.";
+                        }));
+
+
+                    });
+                }
+
+
+            }
+        }
         #endregion
 
 
     }
-       
 
-        
+    public static class ModifyProgressBarColor
+    {
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = false)]
+        static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr w, IntPtr l);
+        public static void SetState(this System.Windows.Forms.ProgressBar pBar, int state)
+        {
+            SendMessage(pBar.Handle, 1040, (IntPtr)state, IntPtr.Zero);
+        }
+    }
+
 }
