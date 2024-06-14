@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
@@ -19,18 +20,18 @@ namespace TJTExplorer.Class
 
         //Const value
         private const uint fileHeaderSize = 0x84;
-        private const uint tjtHeaderSize = 0x2A;     
+        private const uint tjtHeaderSize = 0x2A;
         private const uint writerBufferSize = 4096;
         private const uint fileNameSize = 0x80;
 
         private BinaryReader tjtReader = null;
         private TJCRC16Calculator crc16 = null;
         private uint lastFileIndex = 0;
-        
 
-        public TJTar() 
+
+        public TJTar()
         {
-            this.Files = new List<TJTarFile>();           
+            this.Files = new List<TJTarFile>();
             this.ContentStartDate = DateTime.Now;
             this.ContentEndDate = DateTime.Now;
             this.Version = "V1.00";
@@ -54,10 +55,10 @@ namespace TJTExplorer.Class
             return finalCRC == (short)originCRC;
         }
 
-        
+
 
         private bool CheckSizeOver(ulong newSize)
-        {                     
+        {
             return (GetTotalFileSize() + newSize) > uint.MaxValue;
         }
 
@@ -71,7 +72,7 @@ namespace TJTExplorer.Class
             }
             lastFileIndex = (uint)this.Files.Count;
         }
-          
+
         public void LoadFromFile(string filename)
         {
 
@@ -118,8 +119,8 @@ namespace TJTExplorer.Class
 
                 Files.Add(fileInfo);
             }
-            
-            
+
+
         }
         public ulong GetTotalFileSize()
         {
@@ -170,7 +171,7 @@ namespace TJTExplorer.Class
 
             }
 
-           
+
         }
 
         public void ExtractFile(TJTarFile file, string outFileName)
@@ -206,7 +207,7 @@ namespace TJTExplorer.Class
             {
                 throw new Exception($"This file does not included in the existing TJT.");
             }
-            
+
         }
 
         public void SetContentDate(DateTime startDate, DateTime endDate)
@@ -225,7 +226,7 @@ namespace TJTExplorer.Class
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="TJTarFileSizeOverException"></exception>
         /// <exception cref="TJTarFileNameIsTooLongException"></exception>
-        public async Task AddFilesAsync((string fileName, string fullFilePath)[]files , IProgress<int> progress = null)
+        public async Task AddFilesAsync((string fileName, string fullFilePath)[] files, IProgress<int> progress = null)
         {
             await Task.Run(() =>
             {
@@ -258,7 +259,7 @@ namespace TJTExplorer.Class
                     string filePath = files[i].fullFilePath;
                     ulong size = (ulong)new FileInfo(filePath).Length;
 
-                    if(size > uint.MaxValue)
+                    if (size > uint.MaxValue)
                     {
                         throw new TJTarFileSizeOverException("단일 파일의 크기가 4GB를 초과했습니다.");
                     }
@@ -277,13 +278,13 @@ namespace TJTExplorer.Class
                     }
 
 
-                    
+
                     if (progress != null) progress.Report(i);
                 }
 
                 RealignFiles();
             });
-            
+
 
         }
 
@@ -291,8 +292,8 @@ namespace TJTExplorer.Class
         {
             await Task.Run(() =>
             {
-                
-                using(BinaryWriter outTJT = new BinaryWriter(new FileStream(outTJTFileName, FileMode.Create)))
+
+                using (BinaryWriter outTJT = new BinaryWriter(new FileStream(outTJTFileName, FileMode.Create)))
                 {
 
                     List<byte> tjtHeader = new List<byte>();
@@ -301,7 +302,7 @@ namespace TJTExplorer.Class
 
                     //Create TJT Header
                     //Version
-                    tjtHeader.AddRange(Encoding.ASCII.GetBytes(this.Version.PadRight(0x0E,'\0')));
+                    tjtHeader.AddRange(Encoding.ASCII.GetBytes(this.Version.PadRight(0x0E, '\0')));
                     tjtHeader.AddRange(BitConverter.GetBytes((uint)0)); //unk
                     tjtHeader.AddRange(BitConverter.GetBytes((uint)this.Files.Count));
                     tjtHeader.AddRange(BitConverter.GetBytes((uint)GetTotalFileSize()));
@@ -343,7 +344,7 @@ namespace TJTExplorer.Class
 
                     foreach (var file in this.Files)
                     {
-                        if(file.IsNew) 
+                        if (file.IsNew)
                         {
                             //Todo: 메모리 절약을 위해 BinaryReader로 버퍼 크기씩 읽어들인다음 쓰는 로직으로 바꾸기
                             byte[] t = File.ReadAllBytes(file.RealFilePath);
@@ -355,12 +356,75 @@ namespace TJTExplorer.Class
                             outTJT.Write(GetFileBytes(file));
                         }
                         processedFileCount++;
-                        if (progress != null) progress.Report(processedFileCount);                  
+                        if (progress != null) progress.Report(processedFileCount);
                     }
-                     
+
                 }
 
             });
+        }
+
+        public void RemoveFile(TJTarFile file)
+        {
+
+            //this.Files.Remove(file);
+
+            int rmIdx = -1;
+            for (int i = 0; i < this.Files.Count; i++)
+            {
+                if (this.Files[i].Index == file.Index)
+                {
+                    rmIdx = i;
+                    break;
+                }
+            }
+
+            if (rmIdx < 0)
+            {
+                throw new Exception($"File {file.Name} not found");
+            }
+
+            this.Files.RemoveAt(rmIdx);
+            RealignFiles();
+        }
+
+        public void RemoveFiles(TJTarFile[] files)
+        {
+            int[] removeIndex = new int[files.Length];
+            
+            //초기화
+            for(int i=0; i < removeIndex.Length; i++)
+            {
+                removeIndex[i] = -1;
+            }
+            
+            //검색후 배열에 제거할 인덱스 저장
+            for(int i = 0; i < files.Length; i++)
+            {
+                for(int j = 0; j < this.Files.Count; j++)
+                {
+                    if (files[i].Index == this.Files[j].Index)
+                    {
+                        removeIndex[i] = j;
+                        break;
+                    }
+                }
+            }
+
+            Array.Sort(removeIndex);
+            Array.Reverse(removeIndex);
+
+            //제거
+            for (int i = 0; i < removeIndex.Length; i++)
+            {
+                if (removeIndex[i] >= 0)
+                {
+                    this.Files.RemoveAt(removeIndex[i]);
+                }
+            }
+
+            //재정렬
+            RealignFiles();
         }
 
         public virtual void Dispose()

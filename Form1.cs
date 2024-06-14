@@ -30,8 +30,14 @@ namespace TJTExplorer
 
         private void RefreshFileList()
         {
-            lstTJTFiles.Items.Clear();
 
+            this.Invoke((Action)(() =>
+            {
+                lstTJTFiles.Items.Clear();
+                pbarTJTSize.Value = 0;
+            }));
+            
+           
             foreach (TJTarFile file in TJTFile.Files)
             {
 
@@ -49,17 +55,39 @@ namespace TJTExplorer
                     item.BackColor = Color.LimeGreen;
                 }
 
-                lstTJTFiles.Items.Add(item);
-               
+                this.Invoke((Action)(() =>
+                {
+                    lstTJTFiles.Items.Add(item);
+                }));
                 
+
+
             }
-            lblTJTFileCount.Text = $"{TJTFile.Files.Count}개";
-            lblSize.Text = $"{TJTFile.GetTotalFileSize()}/{uint.MaxValue}";
-            pbarTJTSize.Maximum = 100;
-            int v = (int)Math.Round((double)TJTFile.GetTotalFileSize() / (double)uint.MaxValue * 100.0, 0);
-            pbarTJTSize.Value = v > 100 ? 100 : v;
-            dtpStartDate.Value = TJTFile.ContentStartDate;
-            dtpEndDate.Value = TJTFile.ContentEndDate;
+
+            this.Invoke((Action)(() =>
+            {
+                lblTJTFileCount.Text = $"{TJTFile.Files.Count}개";
+                lblSize.Text = $"{TJTFile.GetTotalFileSize()}/{uint.MaxValue}";
+                pbarTJTSize.Maximum = 100;
+                int v = (int)Math.Round((double)TJTFile.GetTotalFileSize() / (double)uint.MaxValue * 100.0, 0);
+                pbarTJTSize.Value = v > 100 ? 100 : v;
+                //색깔 설정
+                if (v < 50)
+                {
+                    lblSize.ForeColor = Color.Black;
+                }
+                else if (v < 90)
+                {
+                    lblSize.ForeColor = Color.Black;
+                }
+                else
+                {
+                    lblSize.ForeColor = Color.Red;
+                }
+                dtpStartDate.Value = TJTFile.ContentStartDate;
+                dtpEndDate.Value = TJTFile.ContentEndDate;
+            }));
+           
         }
         private void LoadTJT(string filePath)
         {
@@ -174,47 +202,69 @@ namespace TJTExplorer
                 {
                     this.Invoke((Action)(() =>
                     {
-
                         toolStripProgressBar1.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
                         toolStripStatusLabel1.Text = "파일/폴더 정보 가져오는 중";
-                        string folder = folderBrowserDialog.SelectedPath;
-                        string[] files = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
+                    }));
+                   
+                    string folder = folderBrowserDialog.SelectedPath;
+                    string[] files = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
+
+                    this.Invoke((Action)(() =>
+                    {
                         toolStripProgressBar1.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
                         toolStripStatusLabel1.Text = "추가 중..";
-                        (string, string)[] fileNamePair = new (string, string)[files.Length];
+                    }));
+                   
+                    (string, string)[] fileNamePair = new (string, string)[files.Length];
 
+                    this.Invoke((Action)(() =>
+                    {
                         toolStripProgressBar1.Maximum = files.Length;
                         toolStripProgressBar1.Value = 0;
-                        for (int i = 0; i < files.Length; i++)
+                    }));
+                    
+
+                    for (int i = 0; i < files.Length; i++)
+                    {
+                        fileNamePair[i] = (GetRelativePath(files[i], folder), files[i]);
+                        this.Invoke((Action)(() =>
                         {
-                            fileNamePair[i] = (GetRelativePath(files[i], folder), files[i]);
                             toolStripProgressBar1.Value = i;
-                        }
+                        }));
+                        
+                    }
+                    this.Invoke((Action)(() =>
+                    {
                         toolStripProgressBar1.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
                         toolStripStatusLabel1.Text = "추가 중..";
-                        try
+                    }));
+                    
+                    try
+                    {
+                        //Application.DoEvents();
+                        Task t = TJTFile.AddFilesAsync(fileNamePair);
+                        t.GetAwaiter().OnCompleted(() =>
                         {
-                            //Application.DoEvents();
-                            Task t = TJTFile.AddFilesAsync(fileNamePair);
-                            t.GetAwaiter().OnCompleted(() =>
+                            RefreshFileList();
+                            this.Invoke((Action)(() =>
                             {
-                                RefreshFileList();
                                 toolStripStatusLabel1.Text = $"{files.Length}개 파일 추가됨";
                                 toolStripProgressBar1.Value = 0;
                                 toolStripProgressBar1.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
-                            });
-                            t.ContinueWith((E) => 
-                            {
-                                
-                            });
-                        }
-                        catch (TJTarFileSizeOverException)
+                            }));
+                           
+                        });
+                        t.ContinueWith((E) =>
                         {
-                            MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
 
-                       
-                    }));
+                        });
+                    }
+                    catch (TJTarFileSizeOverException)
+                    {
+                        MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+
+                   
                     
                 });
                 
@@ -267,40 +317,52 @@ namespace TJTExplorer
                         createNewTJTFileToolStripMenuItem.Enabled = false;
                         exportToTJTToolStripMenuItem.Enabled = false;
                         extractAllToolStripMenuItem.Enabled = false;
-
-                        var p = new Progress<int>((cnt) =>
-                        {
-                            this.Invoke((Action)(() =>
-                            {
-                                toolStripProgressBar1.Value = cnt + 1;
-                                toolStripStatusLabel1.Text = $"추가 중... ({cnt + 1}/{toolStripProgressBar1.Maximum})";
-                                //Application.DoEvents();
-                            }));
-                        });
-
                         toolStripProgressBar1.Maximum = openFileDialog.FileNames.Length;
-                        
+                    }));                   
 
-                        (string, string)[] fileNamePair = new (string, string)[openFileDialog.FileNames.Length];
-
-                        toolStripStatusLabel1.Text = "파일 정보 분석 중..";
-                        //여기 왜그런지 모르겠는데 엄청 느림
-                        for (int i = 0; i < openFileDialog.FileNames.Length; i++)
+                    var p = new Progress<int>((cnt) =>
+                    {
+                        this.Invoke((Action)(() =>
                         {
-                            string fn = openFileDialog.FileNames[i];
-                            string n = fn.Substring(fn.LastIndexOf('\\')+1); //파일명만 떼오기
-                            fileNamePair[i] = (n, fn);
+                            toolStripProgressBar1.Value = cnt + 1;
+                            toolStripStatusLabel1.Text = $"추가 중... ({cnt + 1}/{toolStripProgressBar1.Maximum})";
+                            //Application.DoEvents();
+                        }));
+                    });
+
+                    
+
+
+                    (string, string)[] fileNamePair = new (string, string)[openFileDialog.FileNames.Length];
+                    this.Invoke((Action)(() =>
+                    {
+                        toolStripStatusLabel1.Text = "파일 정보 분석 중..";
+                    }));
+                   
+
+                    //여기 왜그런지 모르겠는데 엄청 느림
+                    for (int i = 0; i < openFileDialog.FileNames.Length; i++)
+                    {
+                        string fn = openFileDialog.FileNames[i];
+                        string n = fn.Substring(fn.LastIndexOf('\\') + 1); //파일명만 떼오기
+                        fileNamePair[i] = (n, fn);
+
+                        this.Invoke((Action)(() =>
+                        {
                             toolStripProgressBar1.Value = i + 1;
                             toolStripStatusLabel1.Text = $"파일 정보 분석 중.. ({i + 1}/{toolStripProgressBar1.Maximum})";
-                            Application.DoEvents(); //Task.Factory 쓰고 있는데 왜 이거 안해주면 UI 스레드가 차단되는지 모르겠음
-                        }
-                        
-                        
-                        
-                        Task t = TJTFile.AddFilesAsync(fileNamePair, p);
-                        t.GetAwaiter().OnCompleted(() =>
+                        }));
+                       
+                    }
+
+
+
+                    Task t = TJTFile.AddFilesAsync(fileNamePair, p);
+                    t.GetAwaiter().OnCompleted(() =>
+                    {
+                        RefreshFileList();
+                        this.Invoke((Action)(() =>
                         {
-                            RefreshFileList();
                             toolStripStatusLabel1.Text = $"{openFileDialog.FileNames.Length}개 파일 추가됨";
                             btnAddFiles.Enabled = true;
                             btnAddFolder.Enabled = true;
@@ -308,20 +370,20 @@ namespace TJTExplorer
                             createNewTJTFileToolStripMenuItem.Enabled = true;
                             exportToTJTToolStripMenuItem.Enabled = true;
                             extractAllToolStripMenuItem.Enabled = true;
-                        });
-                        t.ContinueWith(ex =>
-                        {
-                            if (ex.Exception.InnerExceptions[0] is TJTarFileSizeOverException)
-                            {
-                                MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            }
-                        }, TaskContinuationOptions.OnlyOnFaulted);
-                        //t.Start();
 
+                        }));
                         
-                    }));
+                    });
+                    t.ContinueWith(ex =>
+                    {
+                        if (ex.Exception.InnerExceptions[0] is TJTarFileSizeOverException)
+                        {
+                            MessageBox.Show("전체 크기가 4GB를 초과하여 더 이상 파일을 추가할 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }, TaskContinuationOptions.OnlyOnFaulted);
+                    //t.Start();
 
-                   
+
                 });
                 
             }
@@ -342,8 +404,8 @@ namespace TJTExplorer
                 {
                     this.Invoke((Action)(() => 
                     {
-                        toolStripProgressBar1.Value = cnt+1;
-                        toolStripStatusLabel1.Text = $"TJT 빌드 중 ({cnt+1}/{toolStripProgressBar1.Maximum})";
+                        toolStripProgressBar1.Value = cnt;
+                        toolStripStatusLabel1.Text = $"TJT 빌드 중 ({cnt}/{toolStripProgressBar1.Maximum})";
 
                     }));
                 });
@@ -379,7 +441,17 @@ namespace TJTExplorer
 
         private void removeSelectedToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (lstTJTFiles.SelectedItems.Count > 0) 
+            {
+                TJTarFile[] delFile = new TJTarFile[lstTJTFiles.SelectedItems.Count];
+                for(int i = 0; i < lstTJTFiles.SelectedItems.Count; i++)
+                {
+                    delFile[i] = (TJTarFile)lstTJTFiles.SelectedItems[i].Tag;
+                }
 
+                TJTFile.RemoveFiles(delFile);
+                RefreshFileList();
+            }
         }
 
         private void exportSelectedToolStripMenuItem_Click(object sender, EventArgs e)
