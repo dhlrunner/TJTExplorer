@@ -15,15 +15,18 @@ using System.Windows.Forms;
 using TJTExplorer.Class;
 using static System.Net.WebRequestMethods;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using File = System.IO.File;
 
 namespace TJTExplorer
 {
     public partial class Form1 : Form
     {
         private TJTar TJTFile;
-        public Form1()
+        private string openTJTPath = null;
+        public Form1(string tjtPath = null)
         {
             InitializeComponent();
+            this.openTJTPath = tjtPath;
         }
 
         #region Custom methods
@@ -125,7 +128,11 @@ namespace TJTExplorer
         #region Form event handling
         private void Form1_Load(object sender, EventArgs e)
         {
-            
+            if (openTJTPath != null) 
+            {
+                if(File.Exists(openTJTPath))
+                    LoadTJT(openTJTPath);
+            }
         }
 
         private void lstTJTFiles_DoubleClick(object sender, EventArgs e)
