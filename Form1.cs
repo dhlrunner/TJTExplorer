@@ -184,7 +184,7 @@ namespace TJTExplorer
         private void openExistTJTFileToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "TJMedia Tar file|*.TJT|All file|*.*";
+            openFileDialog.Filter = "TJMedia Tar file|*.TJT|TJMedia Video Tar file|*.TJV|All file|*.*";
             openFileDialog.Multiselect = false;
             openFileDialog.Title = "Open existing TJT file";
             if (openFileDialog.ShowDialog() == DialogResult.OK)
