@@ -8,6 +8,7 @@ namespace TJTExplorer.Class
 {
     internal class TJCRC16Calculator
     {
+        //Thanks to Shikyu for providing code
         public short CRC { get; private set; }
 
         private readonly short[] crcTable = new short[256];

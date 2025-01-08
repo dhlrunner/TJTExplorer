@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -80,6 +81,12 @@ namespace TJTExplorer.Class
 
             ushort TJTarCRC16 = tjtReader.ReadUInt16();
             this.Version = Encoding.ASCII.GetString(tjtReader.ReadBytes(0x0E)).Split('\0')[0];
+
+            if (this.Version != "V1.00")
+            {
+                throw new TJTarNotSupportedVersionException($"tjt version {this.Version} is not supported yet.");
+            }
+
             uint unk = tjtReader.ReadUInt32();
             uint FileCount = tjtReader.ReadUInt32();
             uint bodySize = tjtReader.ReadUInt32();
@@ -453,6 +460,23 @@ namespace TJTExplorer.Class
     }
 
     //Custom Exception
+    public class TJTarNotSupportedVersionException : Exception
+    {
+        public TJTarNotSupportedVersionException()
+        {
+        }
+
+        public TJTarNotSupportedVersionException(string message)
+            : base(message)
+        {
+        }
+
+        public TJTarNotSupportedVersionException(string message, Exception inner)
+            : base(message, inner)
+        {
+        }
+    }
+
     public class TJTarFileSizeOverException : Exception
     {
         public TJTarFileSizeOverException()

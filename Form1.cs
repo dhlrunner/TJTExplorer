@@ -189,7 +189,15 @@ namespace TJTExplorer
             openFileDialog.Title = "Open existing TJT file";
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                LoadTJT(openFileDialog.FileName);
+                try
+                {
+                    LoadTJT(openFileDialog.FileName);
+                }
+                catch (TJTarNotSupportedVersionException ex)
+                {
+                    MessageBox.Show("지원되지 않는 TJT 버전입니다." + Environment.NewLine + ex.Message, "불러오기 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                
                  //_ = this.TJTFileForRead.BuildAsync("test.tjt");
             }
         }
