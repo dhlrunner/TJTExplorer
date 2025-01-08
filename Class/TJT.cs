@@ -12,6 +12,11 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 
 namespace TJTExplorer.Class
 {
+    internal class TJTarVersionStr
+    {
+        public static readonly string VER100 = "V1.00";
+        public static readonly string VER101 = "V1.01";
+    }
     internal class TJTar : IDisposable
     {
         public List<TJTarFile> Files { get; private set; }
@@ -21,9 +26,12 @@ namespace TJTExplorer.Class
 
         //Const value
         private const uint fileHeaderSize = 0x84;
+        private const uint fileHeaderSize_V101 = 0x108;
         private const uint tjtHeaderSize = 0x2A;
-        private const uint writerBufferSize = 4096;
+        private const uint tjtHeaderSize_V101 = 0x40;        
         private const uint fileNameSize = 0x80;
+        private const uint fileNameSize_V101 = 0x100;
+        private const uint writerBufferSize = 4096;
 
         private BinaryReader tjtReader = null;
         private TJCRC16Calculator crc16 = null;
@@ -35,25 +43,49 @@ namespace TJTExplorer.Class
             this.Files = new List<TJTarFile>();
             this.ContentStartDate = DateTime.Now;
             this.ContentEndDate = DateTime.Now;
-            this.Version = "V1.00";
+            this.Version = TJTarVersionStr.VER100;
         }
 
         private bool CheckTJTCRC(ushort originCRC, uint bodyStartOffset)
         {
             if (tjtReader == null) throw new NullReferenceException("tjtReader is null");
-
             this.crc16 = new TJCRC16Calculator();
-            tjtReader.BaseStream.Seek(2, SeekOrigin.Begin);
-            crc16.Append(tjtReader.ReadBytes((int)tjtHeaderSize));
-            short crc1 = crc16.CRC;
-            crc16.Append(tjtReader.ReadBytes((int)(bodyStartOffset - tjtHeaderSize - 2)));
-            short crc2 = crc16.CRC;
-            short finalCRC = (short)(crc1 + crc2);
 
-            Debug.WriteLine($"crc_header={crc1}, crc_file_header={crc2}, final={finalCRC}");
-            Debug.WriteLine($"calculated_crc={finalCRC}, expected_crc={(short)originCRC}");
+            if (this.Version == TJTarVersionStr.VER100)
+            {              
+                tjtReader.BaseStream.Seek(2, SeekOrigin.Begin);
+                crc16.Append(tjtReader.ReadBytes((int)tjtHeaderSize));
+                short crc1 = crc16.CRC;
+                crc16.Append(tjtReader.ReadBytes((int)(bodyStartOffset - tjtHeaderSize - 2)));
+                short crc2 = crc16.CRC;
+                short finalCRC = (short)(crc1 + crc2);
 
-            return finalCRC == (short)originCRC;
+                Debug.WriteLine($"crc_header={crc1}, crc_file_header={crc2}, final={finalCRC}");
+                Debug.WriteLine($"calculated_crc={finalCRC}, expected_crc={(short)originCRC}");
+
+                return finalCRC == (short)originCRC;
+            }
+            else if (this.Version == TJTarVersionStr.VER101)
+            {
+                //tjtReader.BaseStream.Seek(2, SeekOrigin.Begin);
+                //crc16.Append(tjtReader.ReadBytes((int)(tjtReader.BaseStream.Length - 2)));
+                //short crc1 = crc16.CRC;
+                //crc16.Append(tjtReader.ReadBytes((int)(bodyStartOffset - tjtHeaderSize_V101 - 2)));
+                //short crc2 = crc16.CRC;
+                //short finalCRC = (short)(crc1 + crc2);
+
+                //Debug.WriteLine($"V1.01 crc_header={crc1}, crc_file_header={crc2}, final={finalCRC}");
+                //Debug.WriteLine($"V1.01 calculated_crc={finalCRC}, expected_crc={(short)originCRC}");
+
+                //return finalCRC == (short)originCRC;
+
+                //아직 계산방법 모름
+                return true;
+            }
+            else
+            {
+                throw new TJTarCRCException("Not supported TJT Version");
+            }
         }
 
 
@@ -82,50 +114,97 @@ namespace TJTExplorer.Class
             ushort TJTarCRC16 = tjtReader.ReadUInt16();
             this.Version = Encoding.ASCII.GetString(tjtReader.ReadBytes(0x0E)).Split('\0')[0];
 
-            if (this.Version != "V1.00")
+            if (this.Version == TJTarVersionStr.VER100)
+            {
+                uint unk = tjtReader.ReadUInt32();
+                uint FileCount = tjtReader.ReadUInt32();
+                uint bodySize = tjtReader.ReadUInt32();
+                string startD = Encoding.ASCII.GetString(tjtReader.ReadBytes(8)).Split('\0')[0];
+                string endD = Encoding.ASCII.GetString(tjtReader.ReadBytes(8)).Split('\0')[0];
+
+                this.ContentStartDate = DateTime.ParseExact(startD, "yyyyMMdd", CultureInfo.InvariantCulture);
+                this.ContentEndDate = DateTime.ParseExact(endD, "yyyyMMdd", CultureInfo.InvariantCulture);
+                //CRC16 + TJT헤더크기 + (파일헤더크기 * 파일개수) = 데이터 시작 오프셋
+                uint dataStartOffset = (FileCount * fileHeaderSize) + tjtHeaderSize + 2;
+
+                if (!CheckTJTCRC(TJTarCRC16, dataStartOffset))
+                {
+                    throw new TJTarCRCException("TJTar CRC does not match");
+                }
+
+                tjtReader.BaseStream.Seek(tjtHeaderSize + 2, SeekOrigin.Begin);
+
+                ulong lastFileSize = 0;
+                for (uint i = 0; i < FileCount; i++)
+                {
+                    string fname = Encoding.ASCII.GetString(tjtReader.ReadBytes((int)fileNameSize)).Split('\0')[0];
+                    uint fsize = tjtReader.ReadUInt32();
+                    uint fIdx = i;
+                    ulong fOffset = dataStartOffset + lastFileSize;
+
+                    lastFileSize = lastFileSize + fsize;
+
+                    var fileInfo = new TJTarFile();
+                    fileInfo.Name = fname;
+                    fileInfo.Size = fsize;
+                    fileInfo.Index = fIdx;
+                    fileInfo.StartOffset = fOffset;
+                    fileInfo.IsNew = false;
+
+                    this.lastFileIndex = fIdx + 1;
+
+                    Files.Add(fileInfo);
+                }
+            }
+            else if(this.Version == TJTarVersionStr.VER101)
+            {
+                //일단 모르는 부분은 스킵
+                tjtReader.BaseStream.Seek(0x32, 0);
+
+                uint FileCount = tjtReader.ReadUInt32();
+                uint unknown  = tjtReader.ReadUInt32();
+                uint bodySize = tjtReader.ReadUInt32();
+                
+
+                //CRC16 + TJT헤더크기 + (파일헤더크기 * 파일개수) = 데이터 시작 오프셋
+                uint dataStartOffset = (FileCount * fileHeaderSize_V101) + tjtHeaderSize_V101 + 2;
+
+                if (!CheckTJTCRC(TJTarCRC16, dataStartOffset))
+                {
+                    throw new TJTarCRCException("TJTar V1.01 CRC does not match");
+                }
+
+                tjtReader.BaseStream.Seek(tjtHeaderSize_V101 + 2, SeekOrigin.Begin);
+
+                ulong lastFileSize = 0;
+                for (uint i = 0; i < FileCount; i++)
+                {
+                    string fname = Encoding.ASCII.GetString(tjtReader.ReadBytes((int)fileNameSize_V101)).Split('\0')[0];
+                    uint fsize = tjtReader.ReadUInt32();
+                    uint unk = tjtReader.ReadUInt32();
+                    uint fIdx = i;
+                    ulong fOffset = dataStartOffset + lastFileSize;
+
+                    lastFileSize = lastFileSize + fsize;
+
+                    var fileInfo = new TJTarFile();
+                    fileInfo.Name = fname;
+                    fileInfo.Size = fsize;
+                    fileInfo.Index = fIdx;
+                    fileInfo.StartOffset = fOffset;
+                    fileInfo.IsNew = false;
+
+                    this.lastFileIndex = fIdx + 1;
+
+                    Files.Add(fileInfo);
+                }
+            }
+            else
             {
                 throw new TJTarNotSupportedVersionException($"tjt version {this.Version} is not supported yet.");
             }
 
-            uint unk = tjtReader.ReadUInt32();
-            uint FileCount = tjtReader.ReadUInt32();
-            uint bodySize = tjtReader.ReadUInt32();
-            string startD = Encoding.ASCII.GetString(tjtReader.ReadBytes(8)).Split('\0')[0];
-            string endD = Encoding.ASCII.GetString(tjtReader.ReadBytes(8)).Split('\0')[0];
-
-            this.ContentStartDate = DateTime.ParseExact(startD, "yyyyMMdd", CultureInfo.InvariantCulture);
-            this.ContentEndDate = DateTime.ParseExact(endD, "yyyyMMdd", CultureInfo.InvariantCulture);
-            //CRC16 + TJT헤더크기 + (파일헤더크기 * 파일개수) = 데이터 시작 오프셋
-            uint dataStartOffset = (FileCount * fileHeaderSize) + tjtHeaderSize + 2;
-
-            if (!CheckTJTCRC(TJTarCRC16, dataStartOffset))
-            {
-                throw new TJTarCRCException("TJTar CRC does not match");
-            }
-
-            tjtReader.BaseStream.Seek(tjtHeaderSize + 2, SeekOrigin.Begin);
-
-            ulong lastFileSize = 0;
-            for (uint i = 0; i < FileCount; i++)
-            {
-                string fname = Encoding.ASCII.GetString(tjtReader.ReadBytes((int)fileNameSize)).Split('\0')[0];
-                uint fsize = tjtReader.ReadUInt32();
-                uint fIdx = i;
-                ulong fOffset = dataStartOffset + lastFileSize;
-
-                lastFileSize = lastFileSize + fsize;
-
-                var fileInfo = new TJTarFile();
-                fileInfo.Name = fname;
-                fileInfo.Size = fsize;
-                fileInfo.Index = fIdx;
-                fileInfo.StartOffset = fOffset;
-                fileInfo.IsNew = false;
-
-                this.lastFileIndex = fIdx + 1;
-
-                Files.Add(fileInfo);
-            }
+            
 
 
         }
